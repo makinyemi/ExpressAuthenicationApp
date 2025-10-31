@@ -1,7 +1,7 @@
 export interface RefreshToken {
-  token: string;
-  username: string;
-  expiry: Date;
+    token: string
+    username: string
+    expiry: Date
 }
 
-export let refreshTokens: RefreshToken[] = [];
+export let refreshTokens: RefreshToken[] = []
