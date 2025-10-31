@@ -6,7 +6,7 @@ import {
     signup,
 } from '../../controllers/userController.ts'
 import { users } from '../../models/user.ts'
-import { loginSchema } from '../../schema/schemaValidator.ts'
+import { loginSchema, signupSchema } from '../../schema/schemaValidator.ts'
 import { validateSchema } from '../../middleware/validateSchema.ts'
 const userRouter = express.Router()
 
@@ -16,7 +16,7 @@ userRouter.get('/', (req, res) => {
 
 userRouter.post('/login', loginSchema, validateSchema, login)
 
-userRouter.post('/signup', signup)
+userRouter.post('/signup', signupSchema, validateSchema, signup)
 
 userRouter.post('/logout', logout)
 
