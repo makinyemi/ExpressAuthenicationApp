@@ -45,19 +45,17 @@ export const signup = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
     const { username, password } = req.body
 
-    // Validate user input
-
-    // check if the username actually exist
+    // Check if the username actually exist
     const index = users.findIndex((user) => user.username === username)
 
     if (index === -1) {
-        console.error(`Username does not exist`)
+        console.error(`Username does not exist: ${username}`)
         return res.status(404).json({ message: 'Username does not exist' })
     }
-    const found = { ...users[index] }
+    const user = { ...users[index] }
 
     // Check if password matches database
-    const match = await bcrypt.compare(password, found!.password!)
+    const match = await bcrypt.compare(password, user!.password!)
 
     if (!match) {
         console.error('Incorrect password')
@@ -66,17 +64,17 @@ export const login = async (req: Request, res: Response) => {
             .json({ message: 'Incorrect username/password combination' })
     }
 
-    // Its a match, delete passowrd from object and create access and refresh jwt
+    // Its a match, delete passowrd from user object and create access and refresh token
 
-    delete found!.password
+    delete user!.password
 
-    const accessToken = jwt.sign(found!, config.ACCESS_SECRET_KEY!, {
+    const accessToken = jwt.sign(user!, config.ACCESS_SECRET_KEY!, {
         expiresIn: '1h',
         algorithm: 'HS256',
     })
 
     const refreshToken = jwt.sign(
-        found!.username!,
+        user!.username!,
         config.REFRESH_SECRET_KEY!,
         {
             algorithm: 'HS256',
@@ -85,8 +83,9 @@ export const login = async (req: Request, res: Response) => {
 
     const now = new Date()
 
+    // Store refreshToken in database
     refreshTokens.push({
-        username: found!.username!,
+        username: user!.username!,
         token: refreshToken,
         expiry: new Date(now.getTime() + Number(config.SEVEN_DAYS!)),
     })
@@ -105,17 +104,27 @@ export const login = async (req: Request, res: Response) => {
 export const refresh = (req: Request, res: Response) => {
     const { refreshToken: oldRefreshToken } = req.cookies
 
+    // Validate users refresh token
     if (oldRefreshToken) {
         const payload = jwt.verify(oldRefreshToken, config.REFRESH_SECRET_KEY!)
-        console.log(payload)
 
-        const found = users.find((user) => user.username === payload)
+        const foundUser = users.find((user) => user.username === payload)
 
-        if (!found) {
-            return res.status(401).json({ message: 'user not found' })
+        if (!foundUser) {
+            return res.status(401).json({ message: 'Token not valid' })
         }
 
-        const user = { ...found }
+        // Check the expiry of user token against their stored token?? 
+        const storedToken = refreshTokens.find((token) => token.username === foundUser.username)
+        const now = new Date();
+
+        if (storedToken?.expiry! < now) {
+            // Token expired we should remove token and return error no valid token
+            res.clearCookie("refreshToken");
+            return res.status(401).json({"errorMessage": "Token expired"})
+        }
+
+        const user = { ...foundUser }
 
         delete user.password
 
@@ -127,7 +136,7 @@ export const refresh = (req: Request, res: Response) => {
         return res.status(200).json({ accessToken })
     }
 
-    return res.status(401).json({ message: 'No token' })
+    return res.status(401).json({ message: 'No token found' })
 }
 
 export const logout = (req: Request, res: Response) => {
@@ -140,5 +149,5 @@ export const logout = (req: Request, res: Response) => {
         return res.sendStatus(204)
     }
 
-    return res.status(404).json({ message: 'Cannnot log out ' })
+    return res.status(404).json({ message: 'Error attempting to log out ' })
 }
